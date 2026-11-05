@@ -50,7 +50,42 @@ pub mod registers {
     pub const CHIP_DIG_POWER: u16 = 0x0002;
     pub const CHIP_CLK_CTRL: u16 = 0x0004;
     pub const CHIP_I2S_CTRL: u16 = 0x0006;
+
     pub const CHIP_SSS_CTRL: u16 = 0x000A;
+    // 14	DAP_MIX_LRSWAP	DAP Mixer Input Swap
+    //				0x0 = Normal Operation
+    //				0x1 = Left and Right channels for the DAP MIXER Input are swapped.
+    // 13	DAP_LRSWAP	DAP Mixer Input Swap
+    //				0x0 = Normal Operation
+    //				0x1 = Left and Right channels for the DAP Input are swapped
+    // 12	DAC_LRSWAP	DAC Input Swap
+    //				0x0 = Normal Operation
+    //				0x1 = Left and Right channels for the DAC are swapped
+    // 10	I2S_LRSWAP	I2S_DOUT Swap
+    //				0x0 = Normal Operation
+    //				0x1 = Left and Right channels for the I2S_DOUT are swapped
+    // 9:8	DAP_MIX_SELECT	Select data source for DAP mixer
+    //				0x0 = ADC
+    //				0x1 = I2S_IN
+    //				0x2 = Reserved
+    //				0x3 = Reserved
+    // 7:6	DAP_SELECT	Select data source for DAP
+    //				0x0 = ADC
+    //				0x1 = I2S_IN
+    //				0x2 = Reserved
+    //				0x3 = Reserved
+    // 5:4	DAC_SELECT	Select data source for DAC (default=1)
+    //				0x0 = ADC
+    //				0x1 = I2S_IN
+    //				0x2 = Reserved
+    //				0x3 = DAP
+    // 1:0	I2S_SELECT	Select data source for I2S_DOUT
+    //				0x0 = ADC
+    //				0x1 = I2S_IN
+    //				0x2 = Reserved
+    //				0x3 = DAP
+
+
     pub const CHIP_ADCDAC_CTRL: u16 = 0x000E;
     pub const CHIP_DAC_VOL: u16 = 0x0010;
     pub const CHIP_PAD_STRENGTH: u16 = 0x0014;
@@ -367,9 +402,13 @@ impl<I2C: embedded_hal_async::i2c::I2c> SGTL5000<I2C> {
     }
 
     pub async fn enable_audio_processing(&mut self) -> Result<bool, I2C::Error> {
-        // DAP --> IS2_DOUT,
+        // DAP --> IS2_DOUT = 0bxx_xx_xx_11
+        // DAP --> ADC = 0bxx_11_xx_xx
+        // I2S_IN --> DAP = 0x01_xx_xx_xx
+        // ADC --> DAP (MIX) = (upper) 0bxx_xx_xx_00
 
-        self.update_configuration(CHIP_SSS_CTRL, 0b00_00_00_00, 0b01_11_00_00)
+        // 
+        self.update_configuration(CHIP_SSS_CTRL, 0b00_00_00_00, 0b01_11_00_11)
             .await?;
         self.update_configuration(DAP_CONTROL, 0x00, 0b00_0_0_000_1)
             .await?;
@@ -388,7 +427,7 @@ impl<I2C: embedded_hal_async::i2c::I2c> SGTL5000<I2C> {
 
     pub async fn disable_audio_processing(&mut self) -> Result<bool, I2C::Error> {
         self.update_configuration(DAP_CONTROL, 0x00, 0x00).await?;
-        self.update_configuration(CHIP_SSS_CTRL, 0x00, 0x10).await?;
+      self.update_configuration(CHIP_SSS_CTRL, 0x00, 0b10_00_00_00).await?;
 
         Ok(true)
     }
@@ -405,13 +444,13 @@ impl<I2C: embedded_hal_async::i2c::I2c> SGTL5000<I2C> {
         Ok(true)
     }
 
-    //sets the mix channel volume level
+    //sets the mix channel volume level (100%)
     pub async fn set_mix_channel_volume_level(&mut self) -> Result<bool, I2C::Error> {
         self.update_configuration(DAP_MIX_CHAN, 0x80, 0x00).await?;
         Ok(true)
     }
 
-    //sets the mix channel volume level
+    //sets the mix channel volume level (100%)
     pub async fn set_main_channel_volume_level(&mut self) -> Result<bool, I2C::Error> {
         self.update_configuration(DAP_MAIN_CHAN, 0x80, 0x00).await?;
         Ok(true)
